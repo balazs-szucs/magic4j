@@ -1,6 +1,6 @@
 # magic4j
 
-A zero-dependency Java 22+ library that wraps [libmagic](https://www.darwinsys.com/file/) using the
+A zero-dependency Java library that wraps [libmagic](https://www.darwinsys.com/file/) using the
 stable Foreign Function & Memory (FFM) API.  No JNI glue code, no native stubs to compile, no
 Reflection, just direct Java-to-native calls.
 

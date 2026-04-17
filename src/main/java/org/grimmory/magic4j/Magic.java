@@ -33,8 +33,11 @@ public final class Magic implements AutoCloseable {
 
   private static final String DB_RESOURCE = "/magic.mgc";
 
-  // Cached magic.mgc bytes — loaded once from the classpath on first open().
-  private static volatile byte[] cachedDbBytes = null;
+  // Cached off-heap buffers for the bundled magic.mgc database.
+  // Initialized once and kept alive for the lifetime of the JVM to satisfy libmagic's memory
+  // requirements (buffers must outlive the magic_t cookie).
+  private static volatile MemorySegment bundledDbBuffersArr = null;
+  private static volatile MemorySegment bundledDbSizesArr = null;
   private static final Object DB_LOCK = new Object();
 
   private final MemorySegment cookie;
@@ -260,21 +263,12 @@ public final class Magic implements AutoCloseable {
   }
 
   private static void loadBundledDatabase(MemorySegment cookie) {
-    byte[] db = loadDbBytes();
-    try (Arena arena = Arena.ofConfined()) {
-      // Allocate an off-heap buffer and copy the database bytes into it.
-      MemorySegment dataBuffer = arena.allocate(db.length);
-      dataBuffer.copyFrom(MemorySegment.ofArray(db));
-
-      // magic_load_buffers expects: void *buffers[1] = { &dataBuffer }
-      MemorySegment buffersArr = arena.allocate(ValueLayout.ADDRESS);
-      buffersArr.set(ValueLayout.ADDRESS, 0, dataBuffer);
-
-      // and size_t sizes[1] = { db.length }
-      MemorySegment sizesArr = arena.allocate(ValueLayout.JAVA_LONG);
-      sizesArr.set(ValueLayout.JAVA_LONG, 0, (long) db.length);
-
-      int rc = (int) MagicBindings.MAGIC_LOAD_BUFFERS.invokeExact(cookie, buffersArr, sizesArr, 1L);
+    ensureBundledDatabaseInitialized();
+    try {
+      int rc =
+          (int)
+              MagicBindings.MAGIC_LOAD_BUFFERS.invokeExact(
+                  cookie, bundledDbBuffersArr, bundledDbSizesArr, 1L);
       if (rc != 0) {
         throw new MagicException("magic_load_buffers() failed: " + magicError(cookie));
       }
@@ -299,10 +293,11 @@ public final class Magic implements AutoCloseable {
     }
   }
 
-  private static byte[] loadDbBytes() {
-    if (cachedDbBytes != null) return cachedDbBytes;
+  private static void ensureBundledDatabaseInitialized() {
+    if (bundledDbBuffersArr != null) return;
     synchronized (DB_LOCK) {
-      if (cachedDbBytes != null) return cachedDbBytes;
+      if (bundledDbBuffersArr != null) return;
+
       try (InputStream is = Magic.class.getResourceAsStream(DB_RESOURCE)) {
         if (is == null) {
           throw new MagicException(
@@ -311,8 +306,26 @@ public final class Magic implements AutoCloseable {
                   + "'. Ensure the magic4j JAR is complete, or use Magic.open(flags, databasePath)"
                   + " to supply the database explicitly.");
         }
-        cachedDbBytes = is.readAllBytes();
-        return cachedDbBytes;
+
+        byte[] db = is.readAllBytes();
+        // Use an automatic arena so the memory is freed only when the class is unloaded.
+        Arena arena = Arena.ofAuto();
+
+        // 1. Allocate off-heap buffer and copy database bytes.
+        MemorySegment dataBuffer = arena.allocate(db.length);
+        dataBuffer.copyFrom(MemorySegment.ofArray(db));
+
+        // 2. Allocate the pointers array (void *buffers[1])
+        MemorySegment buffersArr = arena.allocate(ValueLayout.ADDRESS);
+        buffersArr.set(ValueLayout.ADDRESS, 0, dataBuffer);
+
+        // 3. Allocate the sizes array (size_t sizes[1])
+        MemorySegment sizesArr = arena.allocate(ValueLayout.JAVA_LONG);
+        sizesArr.set(ValueLayout.JAVA_LONG, 0, (long) db.length);
+
+        // Publish to static fields.
+        bundledDbSizesArr = sizesArr;
+        bundledDbBuffersArr = buffersArr;
       } catch (IOException e) {
         throw new MagicException("Failed to read bundled magic database", e);
       }
