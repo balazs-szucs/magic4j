@@ -1,0 +1,197 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.classifier }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - classifier: linux-x64
+            runner: ubuntu-latest
+            lib_name: libmagic.so
+            upload_db: true
+
+          - classifier: linux-arm64
+            runner: ubuntu-24.04-arm
+            lib_name: libmagic.so
+            upload_db: false
+
+          - classifier: linux-musl-x64
+            runner: ubuntu-latest
+            lib_name: libmagic.so
+            musl_docker: true
+            upload_db: false
+
+          - classifier: linux-musl-arm64
+            runner: ubuntu-24.04-arm
+            lib_name: libmagic.so
+            musl_docker: true
+            upload_db: false
+
+          - classifier: darwin-x64
+            runner: macos-15-intel
+            lib_name: libmagic.dylib
+            upload_db: false
+
+          - classifier: darwin-arm64
+            runner: macos-14
+            lib_name: libmagic.dylib
+            upload_db: false
+
+          - classifier: windows-x64
+            runner: windows-latest
+            lib_name: magic1.dll
+            upload_db: false
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install libmagic (Debian/Ubuntu)
+        if: runner.os == 'Linux' && !matrix.musl_docker
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libmagic-dev file
+          LIB=$(find /usr/lib -name "libmagic.so.1" | head -1)
+          mkdir -p "src/main/resources/natives/${{ matrix.classifier }}"
+          cp "$LIB" "src/main/resources/natives/${{ matrix.classifier }}/${{ matrix.lib_name }}"
+
+      - name: Extract magic.mgc (linux-x64 only)
+        if: matrix.upload_db
+        run: |
+          DB=$(find /usr/share/misc -name "magic.mgc" | head -1)
+          cp "$DB" src/main/resources/magic.mgc
+
+      - name: Install libmagic (Alpine/musl via Docker)
+        if: matrix.musl_docker
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            alpine:3.21 sh -c '
+              apk add --no-cache libmagic file &&
+              mkdir -p "src/main/resources/natives/${{ matrix.classifier }}" &&
+              LIB=$(find /usr/lib -name "libmagic.so.1" | head -1) &&
+              cp "$LIB" "src/main/resources/natives/${{ matrix.classifier }}/${{ matrix.lib_name }}"
+            '
+
+      - name: Install libmagic (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install libmagic file
+          LIB="$(brew --prefix libmagic)/lib/libmagic.dylib"
+          mkdir -p "src/main/resources/natives/${{ matrix.classifier }}"
+          cp "$LIB" "src/main/resources/natives/${{ matrix.classifier }}/${{ matrix.lib_name }}"
+
+      - name: Install libmagic (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm mingw-w64-x86_64-file"
+          $dll = Get-ChildItem -Path "C:\msys64\mingw64\bin" -Filter "magic1.dll" | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path "src\main\resources\natives\windows-x64"
+          Copy-Item $dll.FullName "src\main\resources\natives\windows-x64\${{ matrix.lib_name }}"
+
+      - name: Verify library exists
+        shell: bash
+        run: test -f "src/main/resources/natives/${{ matrix.classifier }}/${{ matrix.lib_name }}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-${{ matrix.classifier }}
+          path: src/main/resources/natives/${{ matrix.classifier }}/${{ matrix.lib_name }}
+          retention-days: 1
+
+      - name: Upload magic database
+        if: matrix.upload_db
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: magic-db
+          path: src/main/resources/magic.mgc
+          retention-days: 1
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build-native
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@6f229686ee4375cc4a86b2514c89bac4930e82c4 # v5.0.0
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: native-*
+          path: /tmp/native-binaries
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: magic-db
+          path: /tmp/magic-db
+
+      - name: Stage native binaries into resource directories
+        run: |
+          set -euo pipefail
+
+          stage() {
+            local classifier="$1" lib_name="$2"
+            local dest="src/main/resources/natives/${classifier}"
+            mkdir -p "${dest}"
+            cp "/tmp/native-binaries/native-${classifier}/${lib_name}" "${dest}/${lib_name}"
+            echo "Staged ${classifier}/${lib_name} ($(stat -c%s "${dest}/${lib_name}") bytes)"
+          }
+
+          stage linux-x64        libmagic.so
+          stage linux-arm64      libmagic.so
+          stage linux-musl-x64   libmagic.so
+          stage linux-musl-arm64 libmagic.so
+          stage darwin-x64       libmagic.dylib
+          stage darwin-arm64     libmagic.dylib
+          stage windows-x64      magic1.dll
+
+          cp /tmp/magic-db/magic.mgc src/main/resources/magic.mgc
+          echo "Staged magic.mgc ($(stat -c%s src/main/resources/magic.mgc) bytes)"
+
+      - run: ./gradlew verifyNativeClassifiers
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
+            echo "::error::Invalid version tag: $VERSION"
+            exit 1
+          fi
+          sed -i "s/version = \".*\"/version = \"$VERSION\"/" build.gradle.kts
+          echo "Publishing version: $VERSION"
+
+      - run: ./gradlew build
+
+      - run: ./gradlew publishAggregationToCentralPortal
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false

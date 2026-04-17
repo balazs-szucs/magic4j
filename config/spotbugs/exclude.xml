@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- FFM bindings mirror the C API by design: naming, return types, and field layout are intentional. -->
+    <Match>
+        <Class name="~org\.grimmory\.magic4j\.internal\..*Bindings" />
+    </Match>
+</FindBugsFilter>
