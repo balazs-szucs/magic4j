@@ -121,12 +121,14 @@ public final class NativeLoader {
           }
         }
       }
-    } catch (Exception _) {
+    } catch (Exception ignored) {
+      // Ignored: Probe failure just means we aren't on a musl-based system.
     }
     try {
       String maps = Files.readString(Path.of("/proc/self/maps"));
       if (maps.contains("musl")) return true;
-    } catch (Exception _) {
+    } catch (Exception ignored) {
+      // Ignored: Probe failure just means we aren't on a musl-based system.
     }
     return false;
   }
