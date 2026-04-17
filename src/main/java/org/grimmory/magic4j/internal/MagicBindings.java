@@ -44,7 +44,9 @@ public final class MagicBindings {
    * NULL}. Returns 0 on success, -1 on failure.
    */
   public static final MethodHandle MAGIC_LOAD =
-      downcall("magic_load", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+      downcall(
+          "magic_load",
+          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
   /**
    * {@code int magic_load_buffers(magic_t cookie, void **buffers, size_t *sizes, size_t nbuffers)}
@@ -53,7 +55,12 @@ public final class MagicBindings {
   public static final MethodHandle MAGIC_LOAD_BUFFERS =
       downcall(
           "magic_load_buffers",
-          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+          FunctionDescriptor.of(
+              ValueLayout.JAVA_INT,
+              ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS,
+              ValueLayout.JAVA_LONG));
 
   /**
    * {@code const char *magic_file(magic_t cookie, const char *filename)} — return a string
@@ -61,7 +68,9 @@ public final class MagicBindings {
    * libmagic.
    */
   public static final MethodHandle MAGIC_FILE =
-      downcall("magic_file", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+      downcall(
+          "magic_file",
+          FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
   /**
    * {@code const char *magic_buffer(magic_t cookie, const void *buffer, size_t length)} — return a
@@ -69,7 +78,13 @@ public final class MagicBindings {
    * string is owned by libmagic.
    */
   public static final MethodHandle MAGIC_BUFFER =
-      downcall("magic_buffer", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+      downcall(
+          "magic_buffer",
+          FunctionDescriptor.of(
+              ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS,
+              ValueLayout.JAVA_LONG));
 
   /**
    * {@code const char *magic_error(magic_t cookie)} — return a textual description of the last
@@ -84,7 +99,9 @@ public final class MagicBindings {
    * org.grimmory.magic4j.MagicFlags#MAGIC_PRESERVE_ATIME} is set.
    */
   public static final MethodHandle MAGIC_SETFLAGS =
-      downcall("magic_setflags", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+      downcall(
+          "magic_setflags",
+          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
   /**
    * {@code int magic_version(void)} — return the version number of the libmagic shared library
