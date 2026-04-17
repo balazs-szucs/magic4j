@@ -372,7 +372,6 @@ class FormatDetectionTest {
     assertEquals("image/svg+xml", Magic.detectMimeType(SVG));
   }
 
-
   @Test
   void bmp(@TempDir Path tmpDir) throws Exception {
     Path file = tmpDir.resolve("test.bmp");
@@ -592,7 +591,6 @@ class FormatDetectionTest {
     magic.close();
     assertThrows(MagicException.class, () -> magic.setFlags(MagicFlags.MAGIC_MIME_TYPE));
   }
-
 
   /**
    * Verifies all audio formats used by Grimmory satisfy {@code isAudio(mime)} which is implemented
