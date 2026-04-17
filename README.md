@@ -4,7 +4,6 @@ A zero-dependency Java 22+ library that wraps [libmagic](https://www.darwinsys.c
 stable Foreign Function & Memory (FFM) API.  No JNI glue code, no native stubs to compile, no
 Reflection, just direct Java-to-native calls.
 
----
 
 ## Requirements
 
@@ -13,7 +12,6 @@ Reflection, just direct Java-to-native calls.
   - macOS: `brew install libmagic`
   - Ubuntu/Debian: `apt-get install libmagic1`
   - Alpine: `apk add libmagic`
----
 
 ## Installation
 
@@ -111,8 +109,6 @@ try (Magic magic = Magic.open(MagicFlags.MAGIC_MIME_TYPE, myDb)) {
 }
 ```
 
----
-
 ## API overview
 
 ### `Magic`, core class
@@ -151,8 +147,6 @@ All instance methods throw `MagicException` (unchecked) on failure. `detect(Inpu
 
 Flags can be OR-ed: `MagicFlags.MAGIC_MIME_TYPE | MagicFlags.MAGIC_COMPRESS`.
 
----
-
 ## Thread safety
 
 `Magic` instances are **not thread-safe**.  Each thread must create its own instance.  The
@@ -170,9 +164,7 @@ private static final ThreadLocal<Magic> MAGIC =
 String mime = MAGIC.get().detect(bytes);
 ```
 
----
-
-## Supported formats (verified)
+## Supported formats
 
 The table below lists formats verified by the test suite against libmagic 5.47 (Homebrew) on macOS
 and against system libmagic on Ubuntu.  Formats marked **file** are only reliably detected when
@@ -206,29 +198,9 @@ using the file-path API (`detect(Path)`) on macOS; they work with both APIs on L
 | MOBI | `application/x-mobipocket-ebook` | buffer + file |
 | FB2 | `text/xml` / `application/x-fictionbook+xml` | buffer + file |
 
-¹ EPUB detection requires the EPUB-specific magic rule to be present in the database. Databases
+EPUB detection requires the EPUB-specific magic rule to be present in the database. Databases
 without it fall back to `application/zip`, which is technically correct since EPUB is a ZIP
 container.
-
----
-
-## macOS buffer-detection note
-
-On macOS, libmagic's `magic_buffer()` function does **not** invoke OS-level content-analysis APIs
-(Core Services / UTTypeConformsTo).  As a result, RIFF-family formats (WAV, AIFF, WebP) and
-ISO Base Media File Format containers (M4A, M4B, MP4) may be returned as
-`application/octet-stream` when detected from a byte array.
-
-`magic_file()` always uses the full detection engine and works correctly on all platforms.
-
-```java
-// Preferred, uses magic_file() internally
-String mime = Magic.detectMimeType(Path.of("/music/track.m4b"));
-
-// Avoid for audio/RIFF formats on macOS, uses magic_buffer() internally
-byte[] bytes = Files.readAllBytes(Path.of("/music/track.m4b"));
-String mime = Magic.detectMimeType(bytes); // may return "application/octet-stream" on macOS
-```
 
 ## Project structure
 
