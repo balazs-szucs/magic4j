@@ -47,8 +47,6 @@ public final class Magic implements AutoCloseable {
     this.cookie = cookie;
   }
 
-  // -- Factory methods --
-
   /**
    * Opens a new magic cookie with the given flags and loads the bundled {@code magic.mgc} database
    * from the classpath.
@@ -78,8 +76,6 @@ public final class Magic implements AutoCloseable {
     loadDatabaseFromPath(cookie, databasePath);
     return new Magic(cookie);
   }
-
-  // -- Instance detection methods --
 
   /**
    * Identifies the type of the given byte array.
@@ -155,8 +151,6 @@ public final class Magic implements AutoCloseable {
     return detect(in.readAllBytes());
   }
 
-  // -- Flag management --
-
   /**
    * Changes the active flags on this cookie without re-opening or re-loading the database. Useful
    * when reusing a single cookie to run different detection modes (e.g. first description, then
@@ -179,8 +173,6 @@ public final class Magic implements AutoCloseable {
       throw new MagicException("magic_setflags() invocation failed", t);
     }
   }
-
-  // -- Convenience statics (open → detect → close) --
 
   /**
    * One-shot MIME type detection from a byte array. Opens a cookie with {@link
@@ -229,8 +221,6 @@ public final class Magic implements AutoCloseable {
     }
   }
 
-  // -- Lifecycle --
-
   /**
    * Closes the underlying magic cookie. Safe to call more than once; subsequent calls are no-ops.
    */
@@ -244,8 +234,6 @@ public final class Magic implements AutoCloseable {
       }
     }
   }
-
-  // -- Private helpers --
 
   private static MemorySegment openCookie(int flags) {
     try {
@@ -321,7 +309,7 @@ public final class Magic implements AutoCloseable {
 
         // 3. Allocate the sizes array (size_t sizes[1])
         MemorySegment sizesArr = arena.allocate(ValueLayout.JAVA_LONG);
-        sizesArr.set(ValueLayout.JAVA_LONG, 0, (long) db.length);
+        sizesArr.set(ValueLayout.JAVA_LONG, 0, db.length);
 
         // Publish to static fields.
         bundledDbSizesArr = sizesArr;

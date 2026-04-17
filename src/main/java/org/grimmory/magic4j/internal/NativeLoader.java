@@ -56,9 +56,7 @@ public final class NativeLoader {
         }
       } catch (Throwable t) {
         loadError = t;
-        throw (t instanceof NativeLoadException nle)
-            ? nle
-            : new NativeLoadException("Failed to load native library", t);
+        throw new NativeLoadException("Failed to load native library", t);
       }
     }
   }
@@ -123,12 +121,12 @@ public final class NativeLoader {
           }
         }
       }
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     try {
       String maps = Files.readString(Path.of("/proc/self/maps"));
       if (maps.contains("musl")) return true;
-    } catch (Exception ignored) {
+    } catch (Exception _) {
     }
     return false;
   }
